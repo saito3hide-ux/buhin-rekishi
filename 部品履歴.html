@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>部品履歴</title>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --primary-dark: #1557b0;
+      --danger: #c5221f;
+      --success: #137333;
+      --warning: #e37400;
+      --bg: #f1f3f4;
+      --card: #ffffff;
+      --border: #dadce0;
+      --text: #202124;
+      --text-sub: #5f6368;
+      --tab-h: 60px;
+      --hdr-h: 52px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* ── Header ── */
+    .hdr {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: var(--hdr-h);
+      background: var(--primary);
+      color: #fff;
+      display: flex; align-items: center; padding: 0 16px;
+      z-index: 100;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    .hdr h1 { font-size: 19px; font-weight: 600; }
+
+    /* ── Tab bar ── */
+    .tabbar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex; z-index: 100;
+    }
+    .tb {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      border: none; background: none;
+      color: var(--text-sub); font-size: 10px; gap: 3px;
+      cursor: pointer;
+    }
+    .tb.on { color: var(--primary); }
+    .tb svg { width: 22px; height: 22px; }
+
+    /* ── Main ── */
+    .main { margin-top: var(--hdr-h); padding: 14px 12px; }
+    .sec { display: none; }
+    .sec.on { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card); border-radius: 12px;
+      padding: 16px; margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+
+    /* ── Form ── */
+    .fg { margin-bottom: 14px; }
+    .fg:last-child { margin-bottom: 0; }
+    label.lbl { display: block; font-size: 12px; font-weight: 600; color: var(--text-sub); margin-bottom: 5px; letter-spacing: .3px; }
+    .fc {
+      width: 100%; height: 50px; padding: 0 14px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 16px; color: var(--text); background: #fff;
+      -webkit-appearance: none; appearance: none;
+      transition: border-color .15s;
+    }
+    .fc:focus { outline: none; border-color: var(--primary); }
+    select.fc {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235f6368' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+      padding-right: 34px; cursor: pointer;
+    }
+
+    /* ── Lot input row ── */
+    .lot-row { display: flex; gap: 8px; }
+    .lot-row .fc { flex: 1; }
+    .scan-btn {
+      width: 50px; height: 50px; min-width: 50px;
+      border: none; border-radius: 10px;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .scan-btn:active { opacity: .75; }
+    .scan-btn svg { width: 26px; height: 26px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 6px; height: 50px; padding: 0 20px;
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s; user-select: none;
+    }
+    .btn:active { opacity: .75; }
+    .btn-full { width: 100%; }
+    .btn-pri { background: var(--primary); color: #fff; }
+    .btn-sec { background: #e8f0fe; color: var(--primary); }
+    .btn-del { background: #fce8e6; color: var(--danger); }
+    .btn-sm { height: 36px; padding: 0 12px; font-size: 13px; }
+    .btn-xs { height: 30px; padding: 0 10px; font-size: 12px; }
+
+    /* ── History ── */
+    .bar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .hist-item {
+      background: var(--card); border-radius: 12px;
+      padding: 14px 14px 12px; margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .hist-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .hist-part { font-size: 18px; font-weight: 700; color: var(--primary); }
+    .hist-date { font-size: 12px; color: var(--text-sub); padding-top: 2px; }
+    .hist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 10px; }
+    .hist-cell .lbl2 { font-size: 10px; color: var(--text-sub); margin-bottom: 1px; }
+    .hist-cell .val { font-size: 14px; }
+    .hist-cell.wide { grid-column: span 2; }
+    .hist-acts { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Sub-tabs ── */
+    .stabs {
+      display: flex; background: var(--card);
+      border-radius: 10px; padding: 4px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .stb {
+      flex: 1; height: 36px; border: none; border-radius: 7px;
+      background: none; font-size: 13px; color: var(--text-sub);
+      cursor: pointer; transition: all .15s;
+    }
+    .stb.on { background: var(--primary); color: #fff; font-weight: 600; }
+
+    /* ── Master list ── */
+    .mitem {
+      display: flex; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--border);
+    }
+    .mitem:last-child { border-bottom: none; }
+    .mtext { flex: 1; font-size: 15px; }
+    .macts { display: flex; gap: 7px; }
+    .empty { text-align: center; padding: 24px; color: var(--text-sub); font-size: 14px; }
+
+    /* ── Input group ── */
+    .add-row { display: flex; gap: 8px; }
+    .add-row .fc { flex: 1; }
+    .add-row .btn { min-width: 56px; width: auto; }
+
+    /* ── Modal ── */
+    .ovl {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); z-index: 200;
+      align-items: flex-end; justify-content: center;
+    }
+    .ovl.on { display: flex; }
+    .modal {
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 16px;
+      width: 100%; max-width: 600px;
+      max-height: 92vh; overflow-y: auto;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+    .modal-ttl { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+    .mbtns { display: flex; gap: 10px; margin-top: 16px; }
+    .mbtns .btn { flex: 1; }
+
+    /* ── Scanner full-screen (live camera) ── */
+    .scan-screen {
+      display: none; position: fixed; inset: 0;
+      background: #000; z-index: 500;
+      flex-direction: column;
+    }
+    .scan-screen.on { display: flex; }
+    .scan-hdr {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      padding-top: calc(14px + env(safe-area-inset-top, 0px));
+      background: linear-gradient(rgba(0,0,0,.7), transparent);
+      z-index: 10;
+    }
+    .scan-hdr-ttl { color: #fff; font-size: 17px; font-weight: 600; }
+    .scan-cancel-btn {
+      border: none; background: rgba(0,0,0,.4); color: #fff;
+      font-size: 14px; font-weight: 500;
+      padding: 8px 14px; border-radius: 20px; cursor: pointer;
+    }
+    /* Video fills the screen */
+    #scan-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    /* Dark overlay with a transparent window */
+    .scan-overlay {
+      position: absolute; inset: 0; z-index: 5;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .scan-shade-top, .scan-shade-bottom,
+    .scan-shade-left, .scan-shade-right {
+      position: absolute; background: rgba(0,0,0,.55);
+    }
+    .scan-box {
+      position: relative;
+      width: 280px; height: 160px;
+      z-index: 6;
+    }
+    /* Corner markers */
+    .scan-box .c { position: absolute; width: 26px; height: 26px; border-color: #fff; border-style: solid; }
+    .scan-box .c.tl { top: 0; left: 0;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .scan-box .c.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .scan-box .c.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+    .scan-box .c.bl { bottom: 0; left: 0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    /* Scan line animation */
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #1a73e8, transparent);
+      animation: scanline 1.8s ease-in-out infinite;
+    }
+    @keyframes scanline {
+      0%   { top: 0; opacity: 1; }
+      90%  { top: calc(100% - 2px); opacity: 1; }
+      100% { top: calc(100% - 2px); opacity: 0; }
+    }
+    /* Status bar at bottom */
+    .scan-bottom {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+      background: linear-gradient(transparent, rgba(0,0,0,.75));
+      padding: 24px 20px;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+    }
+    .scan-status-txt { color: #fff; font-size: 15px; text-align: center; min-height: 22px; }
+    .scan-status-txt.error   { color: #ff6b6b; }
+    .scan-status-txt.success { color: #6bcb77; font-weight: 600; }
+    .scan-manual-btn {
+      border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1);
+      color: rgba(255,255,255,.8); font-size: 14px;
+      padding: 10px 20px; border-radius: 20px; cursor: pointer;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin .8s linear infinite; display: inline-block; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: calc(var(--tab-h) + 14px + env(safe-area-inset-bottom, 0px));
+      left: 50%; transform: translateX(-50%) translateY(12px);
+      background: #323232; color: #fff;
+      padding: 11px 18px; border-radius: 22px;
+      font-size: 14px; z-index: 400;
+      opacity: 0; transition: all .28s;
+      white-space: nowrap; pointer-events: none;
+    }
+    .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr"><h1>部品履歴</h1></div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- ===== 入力 ===== -->
+  <div class="sec on" id="sec-input">
+    <div class="card">
+      <div class="fg">
+        <label class="lbl">日付</label>
+        <input type="date" class="fc" id="i-date">
+      </div>
+      <div class="fg">
+        <label class="lbl">部品番号</label>
+        <select class="fc" id="i-part"><option value="">選択してください</option></select>
+      </div>
+      <div class="fg">
+        <label class="lbl">数量</label>
+        <input type="number" class="fc" id="i-qty" inputmode="numeric" min="1" placeholder="数量を入力">
+      </div>
+      <div class="fg">
+        <label class="lbl">ロット番号</label>
+        <div class="lot-row">
+          <input type="text" class="fc" id="i-lot" placeholder="スキャンまたは手入力">
+          <button class="scan-btn" onclick="openScanner('input')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+              <line x1="7" y1="12" x2="7" y2="12.01"/><line x1="12" y1="8" x2="12" y2="16"/>
+              <line x1="17" y1="12" x2="17" y2="12.01"/><line x1="7" y1="8" x2="7" y2="8.01"/>
+              <line x1="7" y1="16" x2="7" y2="16.01"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="lbl">設備</label>
+        <select class="fc" id="i-equip"><option value="">選択してください</option></select>
+      </div>
+      <div class="fg">
+        <label class="lbl">ライン</label>
+        <select class="fc" id="i-line"><option value="">選択してください</option></select>
+      </div>
+      <div class="fg">
+        <label class="lbl">作業者</label>
+        <select class="fc" id="i-worker"><option value="">選択してください</option></select>
+      </div>
+      <button class="btn btn-pri btn-full" onclick="saveRecord()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+        </svg>
+        保存する
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 履歴 ===== -->
+  <div class="sec" id="sec-hist">
+    <div class="bar">
+      <button class="btn btn-sec btn-sm" onclick="downloadCSV()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        CSV出力
+      </button>
+    </div>
+    <div id="hist-list"></div>
+  </div>
+
+  <!-- ===== 管理 ===== -->
+  <div class="sec" id="sec-mgmt">
+    <div class="stabs">
+      <button class="stb on" data-sub="parts"    onclick="switchSub(this,'parts')">部品</button>
+      <button class="stb"    data-sub="equip"    onclick="switchSub(this,'equip')">設備</button>
+      <button class="stb"    data-sub="lines"    onclick="switchSub(this,'lines')">ライン</button>
+      <button class="stb"    data-sub="workers"  onclick="switchSub(this,'workers')">作業者</button>
+    </div>
+
+    <!-- 部品 -->
+    <div id="sub-parts">
+      <div class="card">
+        <div class="add-row">
+          <input type="text" class="fc" id="np-val" placeholder="部品番号">
+          <button class="btn btn-pri" onclick="addSimple('parts','np-val')">追加</button>
+        </div>
+      </div>
+      <div class="card" id="lst-parts"></div>
+    </div>
+
+    <!-- 設備 -->
+    <div id="sub-equip" style="display:none">
+      <div class="card">
+        <div class="add-row">
+          <input type="text" class="fc" id="ne-val" placeholder="設備名">
+          <button class="btn btn-pri" onclick="addSimple('equip','ne-val')">追加</button>
+        </div>
+      </div>
+      <div class="card" id="lst-equip"></div>
+    </div>
+
+    <!-- ライン -->
+    <div id="sub-lines" style="display:none">
+      <div class="card">
+        <div class="add-row">
+          <input type="text" class="fc" id="nl-val" placeholder="ライン名">
+          <button class="btn btn-pri" onclick="addSimple('lines','nl-val')">追加</button>
+        </div>
+      </div>
+      <div class="card" id="lst-lines"></div>
+    </div>
+
+    <!-- 作業者 -->
+    <div id="sub-workers" style="display:none">
+      <div class="card">
+        <div class="fg">
+          <label class="lbl">班名（例：214班）</label>
+          <input type="text" class="fc" id="nw-team" placeholder="例：214班">
+        </div>
+        <div class="fg">
+          <label class="lbl">名前（例：齋藤 秀樹）</label>
+          <input type="text" class="fc" id="nw-name" placeholder="例：齋藤 秀樹">
+        </div>
+        <button class="btn btn-pri btn-full" onclick="addWorker()">追加</button>
+      </div>
+      <div class="card" id="lst-workers"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- Tab bar -->
+<div class="tabbar">
+  <button class="tb on" id="tb-input" onclick="switchTab('input')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+    入力
+  </button>
+  <button class="tb" id="tb-hist" onclick="switchTab('hist')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    履歴
+  </button>
+  <button class="tb" id="tb-mgmt" onclick="switchTab('mgmt')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+    管理
+  </button>
+</div>
+
+<!-- Scanner full-screen (live camera) -->
+<div class="scan-screen" id="scan-screen">
+  <div class="scan-hdr">
+    <div class="scan-hdr-ttl">バーコードスキャン</div>
+    <button class="scan-cancel-btn" onclick="closeScanner()">✕ キャンセル</button>
+  </div>
+  <video id="scan-video" autoplay muted playsinline></video>
+  <div class="scan-overlay">
+    <div class="scan-box">
+      <div class="c tl"></div><div class="c tr"></div>
+      <div class="c br"></div><div class="c bl"></div>
+      <div class="scan-line"></div>
+    </div>
+  </div>
+  <div class="scan-bottom">
+    <div class="scan-status-txt" id="scan-status">バーコードを枠内に合わせてください</div>
+    <button class="scan-manual-btn" onclick="closeScanner('manual')">手入力に切り替える</button>
+  </div>
+  <div id="qr-hidden" style="display:none"></div>
+</div>
+
+<!-- Edit record modal -->
+<div class="ovl" id="ovl-edit">
+  <div class="modal">
+    <div class="modal-ttl">履歴を編集</div>
+    <div class="fg"><label class="lbl">日付</label><input type="date" class="fc" id="e-date"></div>
+    <div class="fg">
+      <label class="lbl">部品番号</label>
+      <select class="fc" id="e-part"><option value="">選択してください</option></select>
+    </div>
+    <div class="fg"><label class="lbl">数量</label><input type="number" class="fc" id="e-qty" inputmode="numeric" min="1"></div>
+    <div class="fg"><label class="lbl">ロット番号</label><input type="text" class="fc" id="e-lot"></div>
+    <div class="fg">
+      <label class="lbl">設備</label>
+      <select class="fc" id="e-equip"><option value="">選択してください</option></select>
+    </div>
+    <div class="fg">
+      <label class="lbl">ライン</label>
+      <select class="fc" id="e-line"><option value="">選択してください</option></select>
+    </div>
+    <div class="fg">
+      <label class="lbl">作業者</label>
+      <select class="fc" id="e-worker"><option value="">選択してください</option></select>
+    </div>
+    <div class="mbtns">
+      <button class="btn btn-sec" onclick="closeEdit()">キャンセル</button>
+      <button class="btn btn-pri" onclick="updateRecord()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit master modal -->
+<div class="ovl" id="ovl-mstr">
+  <div class="modal">
+    <div class="modal-ttl" id="mstr-ttl">編集</div>
+    <div id="mstr-body"></div>
+    <div class="mbtns">
+      <button class="btn btn-sec" onclick="closeMstr()">キャンセル</button>
+      <button class="btn btn-pri" onclick="saveMstr()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+/* =========================================================
+   State
+   ========================================================= */
+const SK = { records:'phr_rec', parts:'phr_parts', equip:'phr_equip', lines:'phr_lines', workers:'phr_wrk' };
+
+let S = { records:[], parts:[], equip:[], lines:[], workers:[] };
+let editId = null;        // editing record id
+let mstrCtx = null;       // { type, id }
+let scanCtx = null;       // 'input' or 'edit'
+
+/* =========================================================
+   Storage
+   ========================================================= */
+function load() {
+  for (const k of Object.keys(SK)) {
+    try { const d = localStorage.getItem(SK[k]); if (d) S[k] = JSON.parse(d); } catch(e){}
+  }
+}
+function persist(k) { localStorage.setItem(SK[k], JSON.stringify(S[k])); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+/* =========================================================
+   Navigation
+   ========================================================= */
+function switchTab(tab) {
+  ['input','hist','mgmt'].forEach(t => {
+    document.getElementById('sec-'+t).classList.toggle('on', t===tab);
+    document.getElementById('tb-'+t).classList.toggle('on', t===tab);
+  });
+  if (tab==='hist') renderHist();
+  if (tab==='mgmt') renderSub('parts');
+}
+
+function switchSub(btn, sub) {
+  document.querySelectorAll('.stb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  ['parts','equip','lines','workers'].forEach(s => {
+    document.getElementById('sub-'+s).style.display = s===sub ? '' : 'none';
+  });
+  renderSub(sub);
+}
+
+/* =========================================================
+   Dropdowns helper
+   ========================================================= */
+function fillSel(id, items, selected='', withBlank=false) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '';
+  if (withBlank) sel.innerHTML = '<option value="">選択してください</option>';
+  items.forEach(({v,l}) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = l || v;
+    if (v === selected) o.selected = true;
+    sel.appendChild(o);
+  });
+  // If selected value not in list, add it as a note
+  if (selected && !items.find(x => x.v === selected)) {
+    const o = document.createElement('option');
+    o.value = selected; o.textContent = selected + '（削除済）'; o.selected = true;
+    sel.insertBefore(o, sel.options[withBlank ? 1 : 0] || null);
+  }
+}
+
+function workerItems() {
+  return S.workers.map(w => ({ v: w.team+' '+w.name, l: w.team+' '+w.name }));
+}
+
+function refreshInputDrops() {
+  fillSel('i-part',   S.parts.map(x=>({v:x.v,l:x.v})), '', true);
+  fillSel('i-equip',  S.equip.map(x=>({v:x.v,l:x.v})), '', true);
+  fillSel('i-line',   S.lines.map(x=>({v:x.v,l:x.v})), '', true);
+  fillSel('i-worker', workerItems(), '', true);
+}
+
+function refreshEditDrops(r) {
+  fillSel('e-part',   S.parts.map(x=>({v:x.v,l:x.v})),   r.partNo,    true);
+  fillSel('e-equip',  S.equip.map(x=>({v:x.v,l:x.v})),   r.equipment, true);
+  fillSel('e-line',   S.lines.map(x=>({v:x.v,l:x.v})),   r.line,      true);
+  fillSel('e-worker', workerItems(),                       r.worker,    true);
+}
+
+/* =========================================================
+   Input / Save
+   ========================================================= */
+function setToday() {
+  const d = new Date();
+  document.getElementById('i-date').value =
+    d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function saveRecord() {
+  const date  = v('i-date');
+  const partNo= v('i-part');
+  const qty   = v('i-qty');
+  const lot   = v('i-lot');
+  const equip = v('i-equip');
+  const line  = v('i-line');
+  const worker= v('i-worker');
+
+  if (!date||!partNo||!qty||!lot||!equip||!line||!worker) {
+    toast('すべての項目を入力してください'); return;
+  }
+  if (parseInt(qty) < 1) { toast('数量は1以上を入力してください'); return; }
+
+  S.records.unshift({ id:uid(), date, partNo, quantity:parseInt(qty), lotNo:lot, equipment:equip, line, worker, at:Date.now() });
+  persist('records');
+
+  // reset form except date
+  ['i-part','i-equip','i-line','i-worker'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('i-qty').value='';
+  document.getElementById('i-lot').value='';
+  toast('保存しました ✓');
+}
+
+/* =========================================================
+   History
+   ========================================================= */
+function renderHist() {
+  const el = document.getElementById('hist-list');
+  if (!S.records.length) {
+    el.innerHTML = '<div class="empty">履歴はありません</div>'; return;
+  }
+  el.innerHTML = S.records.map(r => `
+    <div class="hist-item">
+      <div class="hist-top">
+        <div class="hist-part">${x(r.partNo)}</div>
+        <div class="hist-date">${r.date}</div>
+      </div>
+      <div class="hist-grid">
+        <div class="hist-cell"><div class="lbl2">数量</div><div class="val">${r.quantity}</div></div>
+        <div class="hist-cell"><div class="lbl2">ロット番号</div><div class="val">${x(r.lotNo)}</div></div>
+        <div class="hist-cell"><div class="lbl2">設備</div><div class="val">${x(r.equipment)}</div></div>
+        <div class="hist-cell"><div class="lbl2">ライン</div><div class="val">${x(r.line)}</div></div>
+        <div class="hist-cell wide"><div class="lbl2">作業者</div><div class="val">${x(r.worker)}</div></div>
+      </div>
+      <div class="hist-acts">
+        <button class="btn btn-sec btn-sm" onclick="openEdit('${r.id}')">編集</button>
+        <button class="btn btn-del btn-sm" onclick="delRecord('${r.id}')">削除</button>
+      </div>
+    </div>`).join('');
+}
+
+function delRecord(id) {
+  if (!confirm('この履歴を削除しますか？')) return;
+  S.records = S.records.filter(r => r.id !== id);
+  persist('records');
+  renderHist();
+  toast('削除しました');
+}
+
+function openEdit(id) {
+  editId = id;
+  const r = S.records.find(r => r.id === id);
+  if (!r) return;
+  document.getElementById('e-date').value = r.date;
+  document.getElementById('e-qty').value  = r.quantity;
+  document.getElementById('e-lot').value  = r.lotNo;
+  refreshEditDrops(r);
+  open_ovl('ovl-edit');
+}
+
+function closeEdit() { close_ovl('ovl-edit'); editId=null; }
+
+function updateRecord() {
+  if (!editId) return;
+  const date  = v('e-date');
+  const partNo= v('e-part');
+  const qty   = v('e-qty');
+  const lot   = v('e-lot');
+  const equip = v('e-equip');
+  const line  = v('e-line');
+  const worker= v('e-worker');
+
+  if (!date||!partNo||!qty||!lot||!equip||!line||!worker) {
+    toast('すべての項目を入力してください'); return;
+  }
+  const i = S.records.findIndex(r => r.id === editId);
+  if (i>=0) Object.assign(S.records[i], { date, partNo, quantity:parseInt(qty), lotNo:lot, equipment:equip, line, worker });
+  persist('records');
+  closeEdit();
+  renderHist();
+  toast('更新しました ✓');
+}
+
+/* =========================================================
+   CSV
+   ========================================================= */
+function downloadCSV() {
+  if (!S.records.length) { toast('履歴がありません'); return; }
+  const hdr = ['日付','部品番号','数量','ロット番号','設備','ライン','作業者'];
+  const rows = S.records.map(r => [r.date, r.partNo, r.quantity, r.lotNo, r.equipment, r.line, r.worker]);
+  const csv = '\uFEFF' + [hdr, ...rows].map(row =>
+    row.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')
+  ).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = '部品履歴_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+/* =========================================================
+   Scanner（ZXing — EAN-13/JAN対応ライブカメラ）
+   ========================================================= */
+let zxingControls = null;
+
+function setScanStatus(msg, type) {
+  const el = document.getElementById('scan-status');
+  el.textContent = msg;
+  el.className = 'scan-status-txt' + (type ? ' ' + type : '');
+}
+
+async function openScanner(ctx) {
+  scanCtx = ctx;
+  setScanStatus('カメラを起動中…', '');
+  document.getElementById('scan-screen').classList.add('on');
+
+  if (typeof ZXing === 'undefined') {
+    setScanStatus('ライブラリ読込エラー（ネット接続を確認）', 'error');
+    return;
+  }
+
+  try {
+    const hints = new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13,   // JANコード
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.DATA_MATRIX,
+    ]]]);
+
+    const reader = new ZXing.BrowserMultiFormatReader(hints);
+    zxingControls = await reader.decodeFromConstraints(
+      { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+      'scan-video',
+      (result) => {
+        if (!result) return;
+        const value = result.getText();
+        if (zxingControls) { zxingControls.stop(); zxingControls = null; }
+        document.getElementById('scan-video').srcObject = null;
+        document.getElementById('scan-screen').classList.remove('on');
+        const targetId = scanCtx === 'edit' ? 'e-lot' : 'i-lot';
+        document.getElementById(targetId).value = value;
+        toast('スキャン成功 ✓');
+      }
+    );
+    setScanStatus('バーコードを枠内に合わせてください', '');
+  } catch(e) {
+    setScanStatus('カメラにアクセスできません', 'error');
+  }
+}
+
+function closeScanner(mode) {
+  if (zxingControls) { zxingControls.stop(); zxingControls = null; }
+  const vid = document.getElementById('scan-video');
+  if (vid.srcObject) { vid.srcObject.getTracks().forEach(t => t.stop()); vid.srcObject = null; }
+  document.getElementById('scan-screen').classList.remove('on');
+  if (mode === 'manual') {
+    const targetId = scanCtx === 'edit' ? 'e-lot' : 'i-lot';
+    setTimeout(() => document.getElementById(targetId).focus(), 100);
+  }
+}
+
+/* =========================================================
+   Master CRUD
+   ========================================================= */
+function renderSub(sub) {
+  if (sub==='workers') {
+    const el = document.getElementById('lst-workers');
+    el.innerHTML = S.workers.length
+      ? S.workers.map(w=>`
+        <div class="mitem">
+          <div class="mtext">${x(w.team)} ${x(w.name)}</div>
+          <div class="macts">
+            <button class="btn btn-sec btn-xs" onclick="openMstr('workers','${w.id}')">編集</button>
+            <button class="btn btn-del btn-xs" onclick="delMstr('workers','${w.id}')">削除</button>
+          </div>
+        </div>`).join('')
+      : '<div class="empty">作業者が登録されていません</div>';
+    return;
+  }
+  const el = document.getElementById('lst-'+sub);
+  el.innerHTML = S[sub].length
+    ? S[sub].map(it=>`
+      <div class="mitem">
+        <div class="mtext">${x(it.v)}</div>
+        <div class="macts">
+          <button class="btn btn-sec btn-xs" onclick="openMstr('${sub}','${it.id}')">編集</button>
+          <button class="btn btn-del btn-xs" onclick="delMstr('${sub}','${it.id}')">削除</button>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">データがありません</div>';
+}
+
+function addSimple(sub, inputId) {
+  const val = document.getElementById(inputId).value.trim();
+  if (!val) { toast('値を入力してください'); return; }
+  if (S[sub].find(it => it.v === val)) { toast('すでに登録されています'); return; }
+  S[sub].push({ id:uid(), v:val });
+  persist(sub);
+  document.getElementById(inputId).value='';
+  renderSub(sub);
+  refreshInputDrops();
+  toast('追加しました');
+}
+
+function addWorker() {
+  const team = document.getElementById('nw-team').value.trim();
+  const name = document.getElementById('nw-name').value.trim();
+  if (!team||!name) { toast('班名と名前を入力してください'); return; }
+  S.workers.push({ id:uid(), team, name });
+  persist('workers');
+  document.getElementById('nw-team').value='';
+  document.getElementById('nw-name').value='';
+  renderSub('workers');
+  refreshInputDrops();
+  toast('追加しました');
+}
+
+function delMstr(sub, id) {
+  if (!confirm('削除しますか？')) return;
+  if (sub==='workers') S.workers = S.workers.filter(w=>w.id!==id);
+  else S[sub] = S[sub].filter(it=>it.id!==id);
+  persist(sub);
+  renderSub(sub);
+  refreshInputDrops();
+  toast('削除しました');
+}
+
+function openMstr(sub, id) {
+  mstrCtx = {sub, id};
+  const labels = { parts:'部品番号', equip:'設備', lines:'ライン', workers:'作業者' };
+  document.getElementById('mstr-ttl').textContent = labels[sub]+'を編集';
+  const body = document.getElementById('mstr-body');
+
+  if (sub==='workers') {
+    const w = S.workers.find(w=>w.id===id);
+    body.innerHTML = `
+      <div class="fg"><label class="lbl">班名</label><input type="text" class="fc" id="me-team" value="${x(w.team)}"></div>
+      <div class="fg"><label class="lbl">名前</label><input type="text" class="fc" id="me-name" value="${x(w.name)}"></div>`;
+  } else {
+    const it = S[sub].find(it=>it.id===id);
+    const lb = {parts:'部品番号', equip:'設備名', lines:'ライン名'};
+    body.innerHTML = `<div class="fg"><label class="lbl">${lb[sub]}</label><input type="text" class="fc" id="me-val" value="${x(it.v)}"></div>`;
+  }
+  open_ovl('ovl-mstr');
+}
+
+function closeMstr() { close_ovl('ovl-mstr'); mstrCtx=null; }
+
+function saveMstr() {
+  if (!mstrCtx) return;
+  const {sub, id} = mstrCtx;
+  if (sub==='workers') {
+    const team = document.getElementById('me-team').value.trim();
+    const name = document.getElementById('me-name').value.trim();
+    if (!team||!name) { toast('入力してください'); return; }
+    const i = S.workers.findIndex(w=>w.id===id);
+    if (i>=0) S.workers[i] = {id, team, name};
+    persist('workers');
+  } else {
+    const val = document.getElementById('me-val').value.trim();
+    if (!val) { toast('入力してください'); return; }
+    const i = S[sub].findIndex(it=>it.id===id);
+    if (i>=0) S[sub][i] = {id, v:val};
+    persist(sub);
+  }
+  closeMstr();
+  renderSub(sub);
+  refreshInputDrops();
+  toast('更新しました ✓');
+}
+
+/* =========================================================
+   Modal helpers
+   ========================================================= */
+function open_ovl(id)  { document.getElementById(id).classList.add('on'); }
+function close_ovl(id) { document.getElementById(id).classList.remove('on'); }
+
+// Close modals on backdrop click
+['ovl-edit','ovl-mstr'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target===this) {
+      if (id==='ovl-edit') closeEdit();
+      else closeMstr();
+    }
+  });
+});
+
+/* =========================================================
+   Utilities
+   ========================================================= */
+function v(id) { return document.getElementById(id).value.trim(); }
+function x(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+/* =========================================================
+   Init
+   ========================================================= */
+function init() {
+  load();
+  setToday();
+  refreshInputDrops();
+}
+
+init();
+</script>
+</body>
+</html>
