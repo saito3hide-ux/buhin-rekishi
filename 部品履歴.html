@@ -129,7 +129,14 @@
     }
     .hist-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
     .hist-part { font-size: 18px; font-weight: 700; color: var(--primary); }
-    .hist-date { font-size: 12px; color: var(--text-sub); padding-top: 2px; }
+    .hist-date { font-size: 11px; color: var(--text-sub); padding-top: 2px; line-height: 1.5; text-align: right; }
+    .parts-group-hdr {
+      font-size: 12px; font-weight: 700; color: var(--primary);
+      padding: 10px 0 5px; margin-top: 4px;
+      border-bottom: 2px solid var(--primary);
+      letter-spacing: .3px;
+    }
+    .parts-group:first-child .parts-group-hdr { padding-top: 2px; margin-top: 0; }
     .hist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 10px; }
     .hist-cell .lbl2 { font-size: 10px; color: var(--text-sub); margin-bottom: 1px; }
     .hist-cell .val { font-size: 14px; }
@@ -292,7 +299,7 @@
     <div class="card">
       <div class="fg">
         <label class="lbl">日付</label>
-        <input type="date" class="fc" id="i-date">
+        <input type="datetime-local" class="fc" id="i-date">
       </div>
       <div class="fg">
         <label class="lbl">ライン名</label>
@@ -428,7 +435,7 @@
 <div class="ovl" id="ovl-edit">
   <div class="modal">
     <div class="modal-ttl">履歴を編集</div>
-    <div class="fg"><label class="lbl">日付</label><input type="date" class="fc" id="e-date"></div>
+    <div class="fg"><label class="lbl">日付</label><input type="datetime-local" class="fc" id="e-date"></div>
     <div class="fg">
       <label class="lbl">ライン名</label>
       <select class="fc" id="e-line" onchange="onLineChange('edit')"><option value="">選択してください</option></select>
@@ -555,8 +562,19 @@ function refreshInputDrops() {
    ========================================================= */
 function setToday() {
   const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
   document.getElementById('i-date').value =
-    d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDate(str) {
+  if (!str) return str;
+  const d = new Date(str);
+  if (isNaN(d)) return str;
+  const dow = ['日','月','火','水','木','金','土'][d.getDay()];
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}（${dow}）`
+       + `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function saveRecord() {
@@ -591,7 +609,7 @@ function renderHist() {
     <div class="hist-item">
       <div class="hist-top">
         <div class="hist-part">${x(r.partName)}</div>
-        <div class="hist-date">${r.date}</div>
+        <div class="hist-date">${formatDate(r.date)}</div>
       </div>
       <div class="hist-grid">
         <div class="hist-cell"><div class="lbl2">ライン</div><div class="val">${x(r.line)}</div></div>
@@ -733,20 +751,28 @@ function closeScanner(mode) {
 function renderSub(sub) {
   if (sub === 'parts') {
     const el = document.getElementById('lst-parts');
-    el.innerHTML = S.parts.length
-      ? S.parts.map(it => {
-          const line = S.lines.find(l => l.id === it.lineId);
-          const lineLabel = line ? line.v : '（ライン未設定）';
-          return `
+    if (!S.parts.length) { el.innerHTML = '<div class="empty">データがありません</div>'; return; }
+    // ラインごとにグループ化
+    const groups = {};
+    S.parts.forEach(it => {
+      const line = S.lines.find(l => l.id === it.lineId);
+      const key  = it.lineId || '__none__';
+      const lbl  = line ? line.v : '（ライン未設定）';
+      if (!groups[key]) groups[key] = { lbl, items: [] };
+      groups[key].items.push(it);
+    });
+    el.innerHTML = Object.values(groups).map((g, gi) => `
+      <div class="parts-group">
+        <div class="parts-group-hdr">${x(g.lbl)}</div>
+        ${g.items.map(it => `
           <div class="mitem">
-            <div class="mtext">[${x(lineLabel)}] ${x(it.v)}</div>
+            <div class="mtext">${x(it.v)}</div>
             <div class="macts">
               <button class="btn btn-sec btn-xs" onclick="openMstr('parts','${it.id}')">編集</button>
               <button class="btn btn-del btn-xs" onclick="delMstr('parts','${it.id}')">削除</button>
             </div>
-          </div>`;
-        }).join('')
-      : '<div class="empty">データがありません</div>';
+          </div>`).join('')}
+      </div>`).join('');
     return;
   }
   const el = document.getElementById('lst-'+sub);
